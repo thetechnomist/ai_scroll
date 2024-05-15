@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>The History of AI</title>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+<style>
+body {
+    background-color: black;
+    color: white;
+}
+.axis path, .axis line {
+    fill: none;
+    stroke: white;
+    shape-rendering: crispEdges;
+}
+.d3-tip {
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+  max-width: 200px;
+}
+</style>
+<body>
+<div id="chart"></div>
+<script>
+d3.csv("datasort.csv", function(error, data) {
+  d3.csv("ngram_updated.csv", function(error2, ngramdata) {
+    if (error || error2) throw error;
+
+    data.forEach(d => {
+      d.year = +d.year;
+      d.index = 0;
+    });
+    let i = 0;
+    let currYear = -1000;
+    data.forEach(elem => {
+      if (currYear === elem.year) {
+        elem.index = i;
+        i++;
+      } else {
+        i = 0;
+        elem.index = i;
+        currYear = elem.year;
+      }
+    });
+
+    var ex_chart = example().zoom(true);
+
+    d3.select('#chart')
+      .append("svg").attr("width", window.innerWidth).attr("height", window.innerHeight)
+      .datum(data).call(ex_chart);
+
+    function example() {
+      var svg;
+
+      // adjust to screen size
+      var margin = { top: 20, right: 20, bottom: 30, left: 40 },
+        width = window.innerWidth - margin.left - margin.right,
+        height = window.innerHeight - margin.top - margin.bottom;
+
+      var categories = {
+        C: "Creative Work",
+        F: "Foundational Research",
+        R: "Important Paper",
+        T: "Physical Device or Technology",
+        P: "Philosophy or Theory"
+      };
+      var xaxis = d3.svg.axis().tickFormat(d3.format("d"));
+      var xscale = d3.scale.linear();
+      var yscale = d3.scale.linear();
+      var color = d3.scale.ordinal()
+        .domain(Object.keys(categories))
+        .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00']);
+      var zoomable = true;
+      var ngramScale = d3.scale.linear()
+        .domain([0, 0.000005]).range([0, 20]);
+
+      ngramdata.forEach(d => {
+        d.year = +d.year;
+        d.value = ngramScale(Number(d.count));
+      });
+
+      var lineTip = d3.tip()
+        .attr('class', 'd3-tip')
+        .offset([-10, 0])
+        .html(function(d) {
+          return "<strong>Year: " + d.year + "</strong><br><span style='color:white'>Value: " + (d.value ? d.value.toFixed(2) : 'N/A') + "</span>";
+        });
+
+      var tip = d3.tip()
+        .attr('class', 'd3-tip')
+        .attr('width', '200px')
+        .offset([-10, 0])
+        .html(function(d) {
+          return "<strong>" + d.year + ": </strong><span style='color:white'>" + d.development + "</span>";
+        });
+
+      var xzoom = d3.behavior.zoom()
+        .x(xscale)
+        .on("zoom", zoomable ? draw : null);
+
+      function chart(selection) {
+        selection.each(function(data) {
+          svg = d3.select(this).selectAll('svg').data([data]);
+          svg.enter().append('svg');
+          var g = svg.append('g')
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+          g.call(tip);
+          g.call(lineTip);
+
+          g.append("defs").append("clipPath")
+            .attr("id", "clip")
+            .append("rect")
+            .attr("width", width - margin.left - margin.right)
+            .attr("height", height - margin.top - margin.bottom);
+
+          g.append("svg:rect")
+            .attr("class", "border")
+            .attr("width", width - margin.left - margin.right)
+            .attr("height", height - margin.top - margin.bottom)
+            .style("stroke", "black")
+            .style("fill", "none");
+
+          g.append("text").attr("class", "title")
+            .attr("transform", "translate(" + 15 + "," + (5 + margin.top) + ")")
+            .attr("style", "font-size:28px;font-family:Consolas, monospace;")
+            .attr("fill", "red")
+            .text("Artificial Intelligence Timeline");
+
+          g.append("g").attr("class", "x axis")
+            .attr("style", "font-size:14px;font-family:Consolas, monospace; fill: white;")
+            .attr("transform", "translate(" + 0 + "," + (height - margin.top - margin.bottom) + ")");
+
+          g.append("svg:rect")
+            .attr("class", "zoom x box")
+            .attr("width", width - margin.left - margin.right)
+            .attr("height", height)
+            .attr("transform", "translate(" + 0 + "," + 0 + ")")
+            .style("visibility", "hidden")
+            .attr("pointer-events", "all")
+            .call(xzoom);
+
+          g.append("g")
+            .attr("class", "scatter")
+            .attr("clip-path", "url(#clip)");
+
+          g.append("g")
+            .attr("class", "line")
+            .attr("clip-path", "url(#clip)");
+
+          var redLine = g.append("line")
+            .attr("class", "redline")
+            .attr("x1", xscale(1985))
+            .attr("y1", 0)
+            .attr("x2", xscale(1985))
+            .attr("y2", height - margin.top - margin.bottom)
+            .attr("stroke", "red")
+            .attr("stroke-width", 2);
+
+          // Update the x-axis
+          xscale.domain(d3.extent(data, function(d) {
+            return d.year;
+          }))
+            .range([0, width - margin.left - margin.right]);
+
+          xaxis.scale(xscale)
+            .orient('bottom')
+            .tickPadding(10);
+
+          svg.select('g.x.axis').call(xaxis);
+
+          // Update the y-scale.
+          yscale.domain([0, 20])
+            .range([height - margin.top - margin.bottom, 0]);
+
+          var legend = svg.selectAll(".legend")
+            .data(color.domain())
+            .enter().append("g")
+            .attr("class", "legend")
+            .attr("transform", function(d, i) { return "translate(-25," + (i * 20 + 25) + ")"; });
+
+          legend.append("rect")
+            .attr("x", width - 18)
+            .attr("width", 18)
+            .attr("height", 18)
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .style("fill", color);
+
+          legend.append("text")
+            .attr("x", width - 24)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .attr("style", "font-size:16px;font-family:Consolas, monospace;")
+            .attr("fill", "white")
+            .style("text-anchor", "end")
+            .text(function(d) { return categories[d]; });
+
+          draw();
+        });
+
+        return chart;
+      }
+
+      var line = d3.svg.line()
+        .x(function(d) { return xscale(d.year); })
+        .y(function(d) { return yscale(d.value); });
+
+      function update() {
+        var gs = svg.select("g.scatter");
+
+        svg.call(tip);
+        svg.call(lineTip);
+        var circle = gs.selectAll("circle")
+          .data(function(d) {
+            return d;
+          });
+        const min = xscale.invert(0);
+        const max = xscale.invert(width - margin.left - margin.right);
+        const range = max - min;
+        const radScale = d3.scale.linear().domain([40, 75, 200, 3000]).range([10, 7, 5, 1]).clamp(true);
+        const radius = radScale(range);
+
+        circle.enter().append("svg:circle")
+          .attr("class", "points")
+          .style("fill", d => color(d.category))
+          .attr("r", d => radius)
+          .attr("cx", function(d) {
+            return xscale(d.year);
+          })
+          .attr("cy", function(d) {
+            return yscale(d.index);
+          })
+          .attr('transform', 'translate(0,' + (-1.5 * radius) + ')')  // Further adjust this line to raise the circles
+          .on("mouseenter", tip.show)  // Show tooltip on mouse enter
+          .on("mouseleave", tip.hide)  // Hide tooltip on mouse leave
+          .on("mouseover", function(d) {
+            d3.select(this).style("stroke", "black");
+          })
+          .on("mouseout", function(d) {
+            tip.hide();
+            d3.select(this).style("stroke", "none");
+          });
+
+        circle.attr("cx", function(d) {
+          return xscale(d.year);
+        })
+          .attr("cy", function(d) {
+            return yscale(d.index);
+          })
+          .attr("r", radius)
+          .attr('transform', 'translate(0,' + (-1.5 * radius) + ')')  // Further adjust this line to raise the circles
+          .on("mouseenter", tip.show)  // Show tooltip on mouse enter
+          .on("mouseleave", tip.hide)  // Hide tooltip on mouse leave
+          .on("mouseover", function(d) {
+            d3.select(this).style("stroke", "black");
+          })
+          .on("mouseout", function(d) {
+            tip.hide();
+            d3.select(this).style("stroke", "none");
+          });
+
+        circle.exit().remove();
+
+        var gl = svg.select("g.line");
+        d3.selectAll("#p").remove();
+        var path = gl.append("path")
+          .datum(ngramdata)
+          .attr("id", "p")
+          .attr("fill", "none")
+          .attr("stroke", "gold")
+          .attr("stroke-linejoin", "round")
+          .attr("stroke-linecap", "round")
+          .attr("stroke-width", 3)
+          .attr("d", line);
+
+        path.on("mouseover", function(event, d) {
+          lineTip.show(d, this);
+        }).on("mouseout", function(event, d) {
+          lineTip.hide(d, this);
+        });
+
+      }
+
+      function zoom_update() {
+        xzoom = d3.behavior.zoom()
+          .x(xscale)
+          .on("zoom", zoomable ? draw : null);
+
+        svg.select('rect.zoom.x.box').call(xzoom);
+      }
+
+      function draw() {
+        svg.select('g.x.axis').call(xaxis);
+
+        update();
+        zoom_update();
+        svg.select('.redline')
+          .attr("x1", xscale(1988))
+          .attr("x2", xscale(1988));
+      }
+      chart.zoom = function(_) {
+        if (!arguments.length) return zoomable;
+        zoomable = _;
+        return chart;
+      }
+
+      return chart;
+    }
+  });
+});
+</script>
+</body>
