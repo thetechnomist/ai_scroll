@@ -9,6 +9,9 @@
         body {
             background-color: black;
             color: white;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
         }
         #chart {
             width: 100%;
@@ -20,173 +23,216 @@
 <div id="chart"></div>
 <script>
     // Load data from CSV files
-    d3.csv("data/datasort.csv").then(function(data) {
-        d3.csv("data/ngram_updated.csv").then(function(ngramdata) {
-            d3.csv("data/google_trends.csv").then(function(trendsdata) {
-                // Process main data
-                data.forEach(d => {
-                    d.year = +d.year;
-                    d.index = 0;  // Initialize the index field
-                });
-
-                // Calculate indices for plotting
-                let i = 0;
-                let currYear = -1000;
-                data.forEach(d => {
-                    if (currYear === d.year) {
-                        d.index = i;
-                        i++;
-                    } else {
-                        i = 0;
-                        d.index = i;
-                        currYear = d.year;
-                    }
-                });
-
-                // Process ngram data
-                const ngramScale = d3.scaleLinear().domain([0, 0.000005]).range([0, 20]);
-                ngramdata.forEach(d => {
-                    d.year = +d.year;
-                    d.value = ngramScale(Number(d.count));
-                });
-
-                // Process trends data
-                trendsdata.forEach(d => {
-                    d.year = +d.Year;
-                    d.popularity = Math.max(0, +d['AI Popularity']); // Ensure no negative values
-                });
-
-                // Define categories and colors
-                const categories = {
-                    C: "Creative Work",
-                    F: "Foundational Research",
-                    R: "Important Paper",
-                    T: "Physical Device or Technology",
-                    P: "Philosophy or Theory"
-                };
-                const colorMap = {
-                    C: '#e41a1c',
-                    F: '#377eb8',
-                    R: '#4daf4a',
-                    T: '#984ea3',
-                    P: '#ff7f00'
-                };
-
-                // Function to add line breaks to hover text
-                const addLineBreaks = (text, maxLineLength) => {
-                    const words = text.split(" ");
-                    let result = "";
-                    let line = "";
-                    words.forEach(word => {
-                        if ((line + word).length > maxLineLength) {
-                            result += line + "<br>";
-                            line = "";
-                        }
-                        line += word + " ";
-                    });
-                    result += line;
-                    return result.trim();
-                };
-
-                // Prepare scatter data
-                const scatterData = Object.keys(categories).map(category => {
-                    return {
-                        x: data.filter(d => d.category === category).map(d => d.year),
-                        y: data.filter(d => d.category === category).map(d => d.index),
-                        text: data.filter(d => d.category === category).map(d => addLineBreaks(d.development, 40)), // Adjust maxLineLength as needed
-                        mode: 'markers',
-                        type: 'scatter',
-                        name: categories[category],
-                        marker: {
-                            color: colorMap[category],
-                            size: 10
-                        },
-                        hoverinfo: 'x+text+name',
-                        hovertemplate: '<b>Year: %{x}</b><br>%{text}<extra></extra>'
-                    };
-                });
-
-                // Prepare line data
-                const lineData = {
-                    x: ngramdata.map(d => d.year),
-                    y: ngramdata.map(d => d.value),
-                    mode: 'lines',
-                    line: {color: 'gold'},
-                    name: 'Ngram Data'
-                };
-
-                // Prepare trends data
-                const trendsLineData = {
-                    x: trendsdata.map(d => d.year),
-                    y: trendsdata.map(d => d.popularity),
-                    mode: 'lines',
-                    line: {color: 'blue', width: 3}, // Increase line width
-                    name: 'AI Popularity',
-                    yaxis: 'y2'
-                };
-
-                // Layout configuration
-                const layout = {
-                    title: {
-                        text: 'Artificial Intelligence Timeline and Popularity',
-                        font: {
-                            size: 28,
-                            color: 'red'
-                        }
-                    },
-                    xaxis: {
-                        title: 'Year',
-                        titlefont: {
-                            color: 'white'
-                        },
-                        tickfont: {
-                            color: 'white'
-                        },
-                        range: [-1000, 2100] // Adjust the range to fit all data points
-                    },
-                    yaxis: {
-                        title: 'Index',
-                        titlefont: {
-                            color: 'white'
-                        },
-                        tickfont: {
-                            color: 'white'
-                        },
-                        range: [-5, 25], // Raise the zero line by setting a lower range
-                        zeroline: true,
-                        zerolinecolor: 'white'
-                    },
-                    yaxis2: {
-                        title: 'AI Popularity',
-                        titlefont: {color: 'white'},
-                        tickfont: {color: 'white'},
-                        overlaying: 'y',
-                        side: 'right',
-                        range: [0, 100], // Ensure the range starts at 0
-                        zeroline: true,
-                        zerolinecolor: 'white'
-                    },
-                    legend: {
-                        font: {
-                            color: 'white'
-                        }
-                    },
-                    hovermode: 'closest', // Set hover mode to closest
-                    paper_bgcolor: 'black',
-                    plot_bgcolor: 'black'
-                };
-
-                // Plot the chart
-                Plotly.newPlot('chart', [lineData, ...scatterData, trendsLineData], layout);
-
-            }).catch(function(error3) {
-                console.error('Error loading google_trends.csv:', error3);
-            });
-        }).catch(function(error2) {
-            console.error('Error loading ngram_updated.csv:', error2);
+    Promise.all([
+        d3.csv("data/datasort.csv"),
+        d3.csv("data/ngram_updated.csv"),
+        d3.csv("data/google_trends.csv")
+    ]).then(function([data, ngramdata, trendsdata]) {
+        // Process main data
+        data.forEach(d => {
+            d.year = +d.year;
+            d.index = 0;  // Initialize the index field
         });
+
+        // Calculate indices for plotting
+        let i = 0;
+        let currYear = -1000;
+        data.forEach(d => {
+            if (currYear === d.year) {
+                d.index = i;
+                i++;
+            } else {
+                i = 0;
+                d.index = i;
+                currYear = d.year;
+            }
+        });
+
+        // Process ngram data
+        const ngramScale = d3.scaleLinear().domain([0, 0.000005]).range([0, 20]);
+        ngramdata.forEach(d => {
+            d.year = +d.year;
+            d.value = ngramScale(Number(d.count));
+        });
+
+        // Process trends data
+        trendsdata.forEach(d => {
+            d.year = +d.Year;
+            d.popularity = Math.max(0, +d['AI Popularity']); // Ensure no negative values
+        });
+
+        // Define categories and colors
+        const categories = {
+            C: "Creative Work",
+            F: "Foundational Research",
+            R: "Important Paper",
+            T: "Physical Device or Technology",
+            P: "Philosophy or Theory"
+        };
+        const colorMap = {
+            C: '#e41a1c',
+            F: '#377eb8',
+            R: '#4daf4a',
+            T: '#984ea3',
+            P: '#ff7f00'
+        };
+
+        // Function to add line breaks to hover text
+        const addLineBreaks = (text, maxLineLength) => {
+            const words = text.split(" ");
+            let result = "";
+            let line = "";
+            words.forEach(word => {
+                if ((line + word).length > maxLineLength) {
+                    result += line + "<br>";
+                    line = "";
+                }
+                line += word + " ";
+            });
+            result += line;
+            return result.trim();
+        };
+
+        // Prepare combined hover text for each year
+        const combinedHoverText = {};
+        data.forEach(d => {
+            if (!combinedHoverText[d.year]) {
+                combinedHoverText[d.year] = [];
+            }
+            combinedHoverText[d.year].push(addLineBreaks(d.development, 40));
+        });
+
+        // Add Ngram data to hover text
+        ngramdata.forEach(d => {
+            if (!combinedHoverText[d.year]) {
+                combinedHoverText[d.year] = [];
+            }
+            combinedHoverText[d.year].push(`Ngram Value: ${d.value.toFixed(5)}`);
+        });
+
+        // Prepare scatter data
+        const scatterData = Object.keys(categories).map(category => {
+            return {
+                x: data.filter(d => d.category === category).map(d => d.year),
+                y: data.filter(d => d.category === category).map(d => d.index),
+                text: data.filter(d => d.category === category).map(d => combinedHoverText[d.year].join("<br><br>")),
+                mode: 'markers',
+                type: 'scatter',
+                name: categories[category],
+                marker: {
+                    color: colorMap[category],
+                    size: 10
+                },
+                hoverinfo: 'x+text+name',
+                hovertemplate: '<b>Year: %{x}</b><br>%{text}<extra></extra>'
+            };
+        });
+
+        // Prepare line data
+        const lineData = {
+            x: ngramdata.map(d => d.year),
+            y: ngramdata.map(d => d.value),
+            mode: 'lines',
+            line: {color: 'gold'},
+            name: 'Ngram Data',
+            text: ngramdata.map(d => combinedHoverText[d.year].join("<br><br>")),
+            hoverinfo: 'x+text+name',
+            hovertemplate: '<b>Year: %{x}</b><br>%{text}<extra></extra>'
+        };
+
+        // Prepare trends data
+        const trendsLineData = {
+            x: trendsdata.map(d => d.year),
+            y: trendsdata.map(d => d.popularity),
+            mode: 'lines',
+            line: {color: 'blue', width: 3}, // Increase line width
+            name: 'AI Popularity',
+            yaxis: 'y2'
+        };
+
+        // AI Winter years
+        const aiWinterYears = [1974, 1980, 1987, 1993];
+
+        // Prepare layout with vertical lines for AI Winters
+        const layout = {
+            title: {
+                text: 'Artificial Intelligence Timeline and Popularity',
+                font: {
+                    size: 24,
+                    color: 'red'
+                }
+            },
+            xaxis: {
+                title: 'Year',
+                titlefont: {
+                    color: 'white'
+                },
+                tickfont: {
+                    color: 'white'
+                },
+                range: [-1000, 2100], // Adjust the range to fit all data points
+                dtick: 100, // Set dtick to 100 to add more ticks for the years
+                showgrid: true, // Add gridlines
+                gridcolor: 'rgba(255, 255, 255, 0.1)', // Set gridline color
+                zeroline: true, // Show zero line
+                zerolinecolor: 'white' // Set zero line color
+            },
+            yaxis: {
+                title: 'Index',
+                titlefont: {
+                    color: 'white'
+                },
+                tickfont: {
+                    color: 'white'
+                },
+                range: [-5, 25], // Raise the zero line by setting a lower range
+                showgrid: true, // Add gridlines
+                gridcolor: 'rgba(255, 255, 255, 0.1)', // Set gridline color
+                zeroline: true, // Show zero line
+                zerolinecolor: 'white' // Set zero line color
+            },
+            yaxis2: {
+                title: 'AI Popularity',
+                titlefont: {color: 'white'},
+                tickfont: {color: 'white'},
+                overlaying: 'y',
+                side: 'right',
+                range: [0, 100], // Ensure the range starts at 0
+                showgrid: true, // Add gridlines
+                gridcolor: 'rgba(255, 255, 255, 0.1)', // Set gridline color
+                zeroline: true, // Show zero line
+                zerolinecolor: 'white' // Set zero line color
+            },
+            shapes: aiWinterYears.map(year => ({
+                type: 'line',
+                x0: year,
+                x1: year,
+                y0: -5,
+                y1: 25,
+                line: {
+                    color: 'red',
+                    width: 3,
+                    dash: 'dot'
+                }
+            })),
+            legend: {
+                font: {
+                    color: 'white'
+                },
+                orientation: 'h', // Horizontal legend
+                x: 0, // Position the legend outside the plot area
+                y: -0.15 // Position the legend outside the plot area
+            },
+            hovermode: 'closest', // Set hover mode to closest
+            paper_bgcolor: 'black',
+            plot_bgcolor: 'black'
+        };
+
+        // Plot the chart
+        Plotly.newPlot('chart', [lineData, ...scatterData, trendsLineData], layout);
+
     }).catch(function(error) {
-        console.error('Error loading datasort.csv:', error);
+        console.error('Error loading data:', error);
     });
 </script>
 </body>
